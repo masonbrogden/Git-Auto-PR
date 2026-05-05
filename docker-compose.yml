@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    container_name: pr_review_postgres
+    environment:
+      POSTGRES_USER: prbot
+      POSTGRES_PASSWORD: prbot123
+      POSTGRES_DB: prbot_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  bot:
+    build: .
+    container_name: pr_review_bot
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://prbot:prbot123@db:5432/prbot_db
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
+    volumes:
+      - .:/app
+
+volumes:
+  postgres_data:
