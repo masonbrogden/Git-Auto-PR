@@ -1,0 +1,46 @@
+name: PR Review Bot
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      contents: read
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: prbot
+          POSTGRES_PASSWORD: prbot123
+          POSTGRES_DB: prbot_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout PR code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t pr-review-bot .
+
+      - name: Run review bot
+        run: |
+          docker run --rm \
+            --network host \
+            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
+            -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+            -e GITHUB_REPOSITORY=${{ github.repository }} \
+            -e PR_NUMBER=${{ github.event.pull_request.number }} \
+            -e DATABASE_URL=postgresql://prbot:prbot123@localhost:5432/prbot_db \
+            -v ${{ github.workspace }}:/app \
+            pr-review-bot
