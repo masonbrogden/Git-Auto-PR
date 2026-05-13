@@ -32,7 +32,7 @@ def get_pr(repo_name, pr_number):
         raise
 
 def get_pr_diff(repo_name, pr_number):
-    """Get the code diff from a pull request."""
+    """Get the code diff from a pull request with new-file line numbers."""
     try:
         client = get_github_client()
         repo = client.get_repo(repo_name)
@@ -42,13 +42,34 @@ def get_pr_diff(repo_name, pr_number):
         for f in files:
             diff += f"File: {f.filename}\n"
             if f.patch:
-                diff += f"{f.patch}\n"
+                diff += _number_patch_lines(f.patch) + "\n"
             diff += "\n"
         logger.info(f"Fetched diff for PR #{pr_number}")
         return diff
     except Exception as e:
         logger.error(f"Failed to fetch diff for PR #{pr_number}: {e}")
         raise
+
+
+def _number_patch_lines(patch):
+    """Prefix each diff line with its new-file line number."""
+    import re
+    result = []
+    current_line = 0
+    for line in patch.split("\n"):
+        hunk = re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+        if hunk:
+            current_line = int(hunk.group(1))
+            result.append(line)
+        elif line.startswith("+"):
+            result.append(f"{current_line:4d} {line}")
+            current_line += 1
+        elif line.startswith("-"):
+            result.append(f"     {line}")
+        else:
+            result.append(f"{current_line:4d} {line}")
+            current_line += 1
+    return "\n".join(result)
 
 def post_comment(repo_name, pr_number, comment):
     """Post a comment on a pull request."""

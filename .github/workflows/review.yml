@@ -30,31 +30,31 @@ jobs:
       - name: Checkout PR code
         uses: actions/checkout@v4
 
-      - name: Check secrets
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          if [ -z "$OPENAI_API_KEY" ]; then
-            echo "ERROR: OPENAI_API_KEY is empty or not set"
-            exit 1
-          else
-            echo "OPENAI_API_KEY is set (length: ${#OPENAI_API_KEY})"
-          fi
-
       - name: Build Docker image
         run: docker build -t pr-review-bot .
 
       - name: Run review bot
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
           docker run --rm \
             --network host \
             -e GITHUB_TOKEN \
-            -e OPENAI_API_KEY \
+            -e ANTHROPIC_API_KEY \
             -e GITHUB_REPOSITORY=${{ github.repository }} \
             -e PR_NUMBER=${{ github.event.pull_request.number }} \
             -e DATABASE_URL=postgresql://prbot:prbot123@localhost:5432/prbot_db \
             -v ${{ github.workspace }}:/app \
             pr-review-bot
+
+      - name: Notify Slack on failure
+        if: failure()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": ":red_circle: *PR Review Bot failed*\nRepo: `${{ github.repository }}`\nPR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}\n<${{ github.event.pull_request.html_url }}|View PR> | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }'

@@ -1,6 +1,6 @@
 import os
 import logging
-from openai import OpenAI
+import anthropic
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -40,20 +40,19 @@ Diff:
 
 
 def review_diff(diff):
-    """Send a PR diff to OpenAI and return a code review summary."""
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    """Send a PR diff to Claude and return a code review summary."""
+    client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
+        response = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1500,
+            system=_SYSTEM_PROMPT,
             messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": _USER_PROMPT.format(diff=diff)},
             ],
-            max_tokens=1500,
-            temperature=0.3,
         )
-        summary = response.choices[0].message.content
+        summary = response.content[0].text
         logger.info("AI review completed")
         return summary
     except Exception as e:
