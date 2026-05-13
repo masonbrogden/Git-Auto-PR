@@ -34,11 +34,14 @@ jobs:
         run: docker build -t pr-review-bot .
 
       - name: Run review bot
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
           docker run --rm \
             --network host \
-            -e GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }} \
-            -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }} \
+            -e GITHUB_TOKEN \
+            -e OPENAI_API_KEY \
             -e GITHUB_REPOSITORY=${{ github.repository }} \
             -e PR_NUMBER=${{ github.event.pull_request.number }} \
             -e DATABASE_URL=postgresql://prbot:prbot123@localhost:5432/prbot_db \
