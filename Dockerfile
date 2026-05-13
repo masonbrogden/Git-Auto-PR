@@ -7,7 +7,8 @@ WORKDIR /app
 # Copy requirements first (for Docker layer caching)
 COPY requirements.txt .
 
-# Install dependencies
+# Install CA certificates and dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the project
