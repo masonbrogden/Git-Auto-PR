@@ -32,13 +32,13 @@ def main():
     logger.info(f"Changed Python files: {py_files}")
 
     linter_passed, linter_output = run_linter(py_files)
-    tests_passed, coverage_pct, test_output = run_tests()
+    tests_passed, coverage_pct, test_output, coverage_breakdown = run_tests()
     diff = get_pr_diff(repo_name, pr_number)
     ai_summary = review_diff(diff)
 
     log_review(repo_name, pr_number, author, linter_passed, tests_passed, coverage_pct, ai_summary)
 
-    comment = format_comment(linter_passed, tests_passed, coverage_pct, ai_summary)
+    comment = format_comment(linter_passed, tests_passed, coverage_pct, ai_summary, coverage_breakdown)
     post_comment(repo_name, pr_number, comment)
 
     logger.info(f"Review complete for PR #{pr_number}")

@@ -1,7 +1,7 @@
 from unittest.mock import patch, MagicMock
 
 from bot.linter import run_linter
-from bot.tester import run_tests, _parse_coverage
+from bot.tester import run_tests, _parse_coverage, _parse_coverage_breakdown
 from bot.github_client import format_comment
 from bot.db import setup_database, log_review
 
@@ -47,7 +47,7 @@ def test_parse_coverage_not_found():
 def test_run_tests_passes():
     mock_result = MagicMock(returncode=0, stdout="TOTAL    100    0   100%", stderr="")
     with patch("bot.tester.subprocess.run", return_value=mock_result):
-        passed, coverage, output = run_tests()
+        passed, coverage, output, breakdown = run_tests()
     assert passed is True
     assert coverage == 100.0
 
@@ -59,9 +59,22 @@ def test_run_tests_fails():
         stderr="",
     )
     with patch("bot.tester.subprocess.run", return_value=mock_result):
-        passed, coverage, output = run_tests()
+        passed, coverage, output, breakdown = run_tests()
     assert passed is False
     assert coverage == 50.0
+
+
+def test_parse_coverage_breakdown():
+    output = (
+        "bot/ai_reviewer.py    20     2    90%   32, 45\n"
+        "bot/db.py             35     0   100%\n"
+        "bot/main.py           25     5    80%   38-42\n"
+    )
+    rows = _parse_coverage_breakdown(output)
+    assert len(rows) == 3
+    assert rows[0] == {"file": "bot/ai_reviewer.py", "stmts": 20, "miss": 2, "cover": 90, "missing": "32, 45"}
+    assert rows[1]["missing"] == ""
+    assert rows[2]["cover"] == 80
 
 
 # --- github_client ---

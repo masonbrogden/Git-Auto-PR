@@ -62,20 +62,35 @@ def post_comment(repo_name, pr_number, comment):
         logger.error(f"Failed to post comment on PR #{pr_number}: {e}")
         raise
 
-def format_comment(linter_passed, tests_passed, coverage_pct, ai_summary):
+def format_comment(linter_passed, tests_passed, coverage_pct, ai_summary, coverage_breakdown=None):
     """Format the bot's review comment."""
     linter_status = "✅ Passed" if linter_passed else "❌ Failed"
     tests_status = "✅ Passed" if tests_passed else "❌ Failed"
 
-    comment = f"""##  PR Review Bot Report
+    breakdown_section = ""
+    if coverage_breakdown:
+        rows = "\n".join(
+            f"| `{r['file']}` | {r['stmts']} | {r['miss']} | {r['cover']}% | "
+            f"{r['missing'] if r['missing'] else '—'} |"
+            for r in coverage_breakdown
+        )
+        breakdown_section = f"""
+### Coverage Breakdown
+
+| File | Stmts | Miss | Cover | Missing Lines |
+|------|-------|------|-------|---------------|
+{rows}
+"""
+
+    comment = f"""## PR Review Bot Report
 
 | Check | Status |
 |-------|--------|
 | Linter | {linter_status} |
 | Tests | {tests_status} |
 | Coverage | {coverage_pct:.1f}% |
-
-###  AI Code Review
+{breakdown_section}
+### AI Code Review
 {ai_summary}
 
 ---
