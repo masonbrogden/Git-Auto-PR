@@ -20,10 +20,30 @@ services:
       - db
     environment:
       DATABASE_URL: postgresql://prbot:prbot123@db:5432/prbot_db
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       GITHUB_TOKEN: ${GITHUB_TOKEN}
     volumes:
       - .:/app
+
+  api:
+    build: ./api
+    container_name: pr_review_api
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql://prbot:prbot123@db:5432/prbot_db
+    ports:
+      - "8000:8000"
+
+  dashboard:
+    build: ./dashboard
+    container_name: pr_review_dashboard
+    depends_on:
+      - api
+    environment:
+      API_URL: http://localhost:8000
+    ports:
+      - "3000:80"
 
 volumes:
   postgres_data:
