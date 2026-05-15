@@ -56,4 +56,3 @@ runs:
     RUN_TESTS: ${{ inputs.run_tests }}
     COVERAGE_THRESHOLD: ${{ inputs.coverage_threshold }}
     DATABASE_URL: ${{ inputs.database_url }}
-    PR_NUMBER: ${{ github.event.pull_request.number }}

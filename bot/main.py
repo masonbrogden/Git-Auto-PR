@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from dotenv import load_dotenv
 
@@ -35,9 +36,20 @@ def _extract_verdict(ai_summary):
     return "Needs Discussion"
 
 
+def _get_pr_number():
+    ref = os.getenv("GITHUB_REF", "")
+    match = re.match(r"refs/pull/(\d+)/", ref)
+    if match:
+        return int(match.group(1))
+    fallback = os.getenv("PR_NUMBER")
+    if fallback:
+        return int(fallback)
+    raise ValueError(f"Cannot determine PR number from GITHUB_REF={ref!r} or PR_NUMBER env var")
+
+
 def main():
     repo_name = os.getenv("GITHUB_REPOSITORY")
-    pr_number = int(os.getenv("PR_NUMBER"))
+    pr_number = _get_pr_number()
     workspace = os.getenv("GITHUB_WORKSPACE", ".")
 
     run_linter_flag = os.getenv("RUN_LINTER", "true").lower() == "true"
