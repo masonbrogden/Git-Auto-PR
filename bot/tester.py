@@ -6,13 +6,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def run_tests():
+def run_tests(working_dir=None):
     """Run pytest with coverage. Returns (tests_passed, coverage_pct, output, breakdown)."""
     try:
         result = subprocess.run(
             ["pytest", "--cov=.", "--cov-report=term-missing", "-v"],
             capture_output=True,
             text=True,
+            cwd=working_dir,
         )
         output = result.stdout + result.stderr
         tests_passed = result.returncode == 0

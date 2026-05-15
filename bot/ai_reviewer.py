@@ -41,11 +41,12 @@ Diff:
 
 def review_diff(diff):
     """Send a PR diff to Claude and return a code review summary."""
+    model = os.getenv("MODEL", "claude-sonnet-4-6")
     client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
     try:
         response = client.messages.create(
-            model="claude-sonnet-4-6",
+            model=model,
             max_tokens=1500,
             system=_SYSTEM_PROMPT,
             messages=[

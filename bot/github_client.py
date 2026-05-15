@@ -1,4 +1,5 @@
 import os
+import re
 import logging
 from github import Github
 from dotenv import load_dotenv
@@ -53,7 +54,6 @@ def get_pr_diff(repo_name, pr_number):
 
 def _number_patch_lines(patch):
     """Prefix each diff line with its new-file line number."""
-    import re
     result = []
     current_line = 0
     for line in patch.split("\n"):

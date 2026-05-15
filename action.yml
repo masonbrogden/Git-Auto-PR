@@ -1,0 +1,59 @@
+name: 'Git-Auto-PR'
+description: 'AI-powered PR review: lints, tests, and posts a Claude-generated code review as a PR comment'
+author: 'Mason Brogden'
+
+branding:
+  icon: 'code'
+  color: 'purple'
+
+inputs:
+  anthropic_api_key:
+    description: 'Anthropic API key for Claude AI reviews'
+    required: true
+  github_token:
+    description: 'GitHub token for posting PR comments'
+    required: false
+    default: ${{ github.token }}
+  model:
+    description: 'Claude model to use for AI review'
+    required: false
+    default: 'claude-sonnet-4-6'
+  run_linter:
+    description: 'Run flake8 linter on changed Python files (true/false)'
+    required: false
+    default: 'true'
+  run_tests:
+    description: 'Run pytest with coverage (true/false)'
+    required: false
+    default: 'true'
+  coverage_threshold:
+    description: 'Minimum coverage percentage required to pass (0 to disable enforcement)'
+    required: false
+    default: '0'
+  database_url:
+    description: 'PostgreSQL connection URL for logging review history (optional)'
+    required: false
+    default: ''
+
+outputs:
+  verdict:
+    description: 'AI review verdict: Approve, Request Changes, or Needs Discussion'
+  coverage_pct:
+    description: 'Overall test coverage percentage'
+  linter_passed:
+    description: 'Whether the linter check passed (true/false)'
+  tests_passed:
+    description: 'Whether the test suite passed (true/false)'
+
+runs:
+  using: 'docker'
+  image: 'Dockerfile'
+  env:
+    ANTHROPIC_API_KEY: ${{ inputs.anthropic_api_key }}
+    GITHUB_TOKEN: ${{ inputs.github_token }}
+    MODEL: ${{ inputs.model }}
+    RUN_LINTER: ${{ inputs.run_linter }}
+    RUN_TESTS: ${{ inputs.run_tests }}
+    COVERAGE_THRESHOLD: ${{ inputs.coverage_threshold }}
+    DATABASE_URL: ${{ inputs.database_url }}
+    PR_NUMBER: ${{ github.event.pull_request.number }}

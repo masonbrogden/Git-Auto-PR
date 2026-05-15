@@ -19,4 +19,4 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 
 # Default command to run the bot
-CMD ["python", "bot/main.py"]
+CMD ["python", "-m", "bot.main"]
