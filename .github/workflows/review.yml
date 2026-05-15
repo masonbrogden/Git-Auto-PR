@@ -11,50 +11,26 @@ jobs:
       pull-requests: write
       contents: read
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_USER: prbot
-          POSTGRES_PASSWORD: prbot123
-          POSTGRES_DB: prbot_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout PR code
         uses: actions/checkout@v4
 
-      - name: Check secrets
-        env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          if [ -z "$OPENAI_API_KEY" ]; then
-            echo "ERROR: OPENAI_API_KEY is empty or not set"
-            exit 1
-          else
-            echo "OPENAI_API_KEY is set (length: ${#OPENAI_API_KEY})"
-          fi
+      - name: Run Git-Auto-PR
+        uses: ./
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          run_linter: 'true'
+          run_tests: 'true'
+          coverage_threshold: '0'
+          database_url: ${{ secrets.DATABASE_URL }}
 
-      - name: Build Docker image
-        run: docker build -t pr-review-bot .
-
-      - name: Run review bot
+      - name: Notify Slack on failure
+        if: failure()
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
-          docker run --rm \
-            --network host \
-            -e GITHUB_TOKEN \
-            -e OPENAI_API_KEY \
-            -e GITHUB_REPOSITORY=${{ github.repository }} \
-            -e PR_NUMBER=${{ github.event.pull_request.number }} \
-            -e DATABASE_URL=postgresql://prbot:prbot123@localhost:5432/prbot_db \
-            -v ${{ github.workspace }}:/app \
-            pr-review-bot
+          curl -s -X POST "$SLACK_WEBHOOK_URL" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "text": ":red_circle: *PR Review Bot failed*\nRepo: `${{ github.repository }}`\nPR #${{ github.event.pull_request.number }} — ${{ github.event.pull_request.title }}\n<${{ github.event.pull_request.html_url }}|View PR> | <https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}|View run>"
+            }'

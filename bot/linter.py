@@ -5,7 +5,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def run_linter(py_files):
+def run_linter(py_files, working_dir=None):
     """Run flake8 on the given Python files. Returns (passed, output)."""
     if not py_files:
         logger.info("No Python files to lint")
@@ -16,6 +16,7 @@ def run_linter(py_files):
             ["flake8"] + py_files,
             capture_output=True,
             text=True,
+            cwd=working_dir,
         )
         passed = result.returncode == 0
         output = result.stdout + result.stderr
