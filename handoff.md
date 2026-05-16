@@ -1,131 +1,127 @@
 # Handoff — Git-Auto-PR
 
 ## Goal
-Build a GitHub PR Review Bot as a portfolio project. When a PR is opened or updated, GitHub
-Actions triggers a workflow that builds a Docker container, runs automated checks on the PR
-code, and posts a formatted review comment directly on the PR.
 
-Stretch goals (all implemented, last one not yet verified end-to-end):
-1. Slack notification when bot fails — done
-2. React + Recharts dashboard showing review history — built locally, not yet deployed
-3. AI review quality that cites specific line numbers like a senior engineer — in progress
+Build Git-Auto-PR as a legitimate open source GitHub Actions Marketplace tool that any developer
+can add to their repository with a single line:
+
+```yaml
+- uses: masonbrogden/git-auto-pr@v1
+  with:
+    anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+The action runs on every pull request, performs flake8 linting, pytest with coverage, and
+generates a specific line-cited AI code review using Claude — posted directly as a PR comment.
+
+Stretch goals still remaining:
+1. Marketing landing page (React, deployable to Railway or Vercel)
+2. Support for non-Python repositories (language-agnostic linting/testing)
+3. Move api/ and dashboard/ personal infrastructure to a separate repo
 
 ---
 
 ## Current State
 
-The pipeline works end-to-end EXCEPT the AI review step is broken due to a bad secret.
-Everything up to review_diff() runs fine, then fails.
+**The action is published and live on the GitHub Actions Marketplace at v1.0.0.**
 
-Working: PR opened → GitHub Actions → Docker build → flake8 linter → pytest + coverage → Postgres log
-Broken: ANTHROPIC_API_KEY was saved in GitHub Secrets with a trailing newline character.
+Pipeline works end-to-end:
+- PR opened → GitHub Actions → Docker build → flake8 linter → pytest + coverage → Claude AI review → PR comment posted
+- All inputs configurable: model, run_linter, run_tests, coverage_threshold, database_url
+- Outputs wired to GITHUB_OUTPUT: verdict, coverage_pct, linter_passed, tests_passed
+- Postgres logging is optional (skipped if DATABASE_URL is not set)
+- README is written for marketplace with real screenshots of a demo review
+- v1.0.0 tag points to the latest commit on main
 
-The exact error is:
-  httpcore.LocalProtocolError: Illegal header value b'***\n'
-
-The \n after *** (the masked secret) is the literal newline stored in the secret.
-HTTP headers cannot contain newlines, so the SDK rejects the request before it leaves the container.
-
-WHAT TO DO FIRST NEXT SESSION:
-  1. GitHub repo → Settings → Secrets and variables → Actions
-  2. Delete ANTHROPIC_API_KEY
-  3. Re-add it, pasting the key with no trailing newline
-  4. Then retrigger:
-       git commit --allow-empty -m "Retrigger after ANTHROPIC_API_KEY secret fix"
-       git push origin PR-test
-
----
-
-## Branch State
-- PR-test  — active working branch, all recent changes here, PR #1 is the live test PR
-- main     — last stable state (OpenAI-based bot, before Claude migration)
-- All changes in the table below are on PR-test and NOT yet merged to main
-
----
-
-## What Was Changed This Session
-
-| File | Change |
-|------|--------|
-| bot/ai_reviewer.py | Switched from OpenAI (gpt-4o-mini) to Anthropic SDK (claude-sonnet-4-6). Rewrote prompts to be strict and diff-specific. |
-| bot/tester.py | Added _parse_coverage_breakdown() for per-file coverage rows. run_tests() now returns a 4-tuple: (tests_passed, coverage_pct, output, breakdown). |
-| bot/github_client.py | Added _number_patch_lines() to prefix every diff line with its new-file line number. Updated format_comment() to accept and render a Coverage Breakdown table. |
-| bot/main.py | Unpacks 4-tuple from run_tests(), passes coverage_breakdown to format_comment(). |
-| tests/test_bot.py | Updated two tests to unpack 4-tuple. Added test_parse_coverage_breakdown(). Imported _parse_coverage_breakdown. |
-| .github/workflows/review.yml | Removed debug "Check secrets" step. Added Slack failure notification (if: failure()). Swapped OPENAI_API_KEY for ANTHROPIC_API_KEY. |
-| Dockerfile | Added apt-get install ca-certificates before pip install (needed for SSL in slim image). |
-| api/main.py | New FastAPI service: GET /reviews returns all Postgres rows, GET /health for uptime checks. |
-| api/requirements.txt | fastapi, uvicorn, psycopg2-binary |
-| api/Dockerfile | python:3.12-slim, runs uvicorn on port 8000 |
-| dashboard/ | Full React + Vite + Recharts app. Dark theme. Stat cards, area chart (coverage over time), bar chart (pass/fail counts), review history table. |
-| dashboard/Dockerfile | Multi-stage: node build → nginx. entrypoint.sh injects window.API_URL at container start so the URL is configurable without rebuilding the image. |
-| docker-compose.yml | Added api (port 8000) and dashboard (port 3000) services. |
+Branch state:
+- main — published, clean, everything merged here
+- PR-test — deleted
+- feature/user-auth — deleted (was demo branch for screenshots, never merged)
 
 ---
 
 ## Files Actively Being Worked On
-- .github/workflows/review.yml — Slack step still failing (see below)
-- bot/ai_reviewer.py — code is correct, blocked only by the bad secret
+
+None — the codebase is stable. Next session will likely start new files for the landing page.
+
+---
+
+## What Was Done This Session
+
+| File | Change |
+|------|--------|
+| action.yml | Created from scratch — defines name, branding, inputs, outputs, runs using Docker |
+| bot/main.py | Reads RUN_LINTER, RUN_TESTS, COVERAGE_THRESHOLD, DATABASE_URL, GITHUB_WORKSPACE from env. Postgres optional. Writes outputs to GITHUB_OUTPUT. Parses PR number from GITHUB_REF. |
+| bot/ai_reviewer.py | Reads MODEL from env instead of hardcoding claude-sonnet-4-6 |
+| bot/linter.py | Added working_dir param, passed as cwd to subprocess |
+| bot/tester.py | Added working_dir param, passed as cwd to subprocess |
+| bot/github_client.py | Moved import re to module level |
+| Dockerfile | Changed CMD to python -m bot.main so path works from any working directory |
+| requirements.txt | Removed unused openai dependency |
+| .github/workflows/review.yml | Replaced manual docker build with uses: ./ to dogfood the action |
+| README.md | Full rewrite for marketplace — usage, inputs, outputs, config examples, screenshots |
+| handoff.md | This file |
 
 ---
 
 ## What Was Tried and Failed
 
-### 1. Passing secrets inline in docker run command
-  FAILED:  -e OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-GitHub Actions does not interpolate secrets inside multiline run: shell commands.
-  FIX: Declare at the step env: level and pass by name: -e OPENAI_API_KEY
+### 1. github.* context in action.yml runs.env
+ERROR: Unrecognized named-value: 'github'. Located at position 1 within expression: github.event.pull_request.number
+In action.yml's runs.env block, only inputs.* is available — github.* context is not.
+FIX: Removed PR_NUMBER from runs.env entirely. Instead parse it in main.py from GITHUB_REF
+     (which GitHub sets automatically as refs/pull/{number}/merge for all PR events),
+     with PR_NUMBER env var kept as a local dev fallback.
 
-### 2. ANTHROPIC_API_KEY saved with trailing newline — CURRENT BLOCKER
-  ERROR: httpcore.LocalProtocolError: Illegal header value b'***\n'
-The \n is a literal newline stored as part of the secret when pasted into GitHub.
-  FIX: Delete and re-add the secret with no trailing newline (see top of this file).
+### 2. CMD with relative path broke in Docker container action
+When GitHub runs a Docker container action it sets the working directory to /github/workspace
+(the user's repo), not /app where the bot code lives. CMD ["python", "bot/main.py"] failed
+because bot/main.py doesn't exist relative to /github/workspace.
+FIX: Changed to CMD ["python", "-m", "bot.main"]. Since PYTHONPATH=/app is set in the
+     Dockerfile, Python finds the module regardless of working directory.
 
-### 3. npm ci failed in dashboard Docker build
-npm ci requires a package-lock.json which did not exist yet.
-  FIX: Temporarily swapped to npm install, ran it locally, committed package-lock.json,
-       switched back to npm ci.
-
-### 4. Anthropic SSL connection error (before ca-certificates fix)
-python:3.12-slim was missing ca-certificates, causing SSL failures to api.anthropic.com.
-  FIX: Added apt-get install -y ca-certificates to Dockerfile before pip install.
-
-### 5. AI review was generic even after prompt rewrite
-The AI cited no line numbers and returned None for all issues. Two root causes:
-  - gpt-4o-mini is too weak for line-specific analysis
-  - The diff had no line numbers so the model had nothing to cite
-  FIX: Switched to claude-sonnet-4-6 AND added _number_patch_lines() to number every
-       diff line. Not yet verified end-to-end because of the secret bug.
-
-### 6. Slack notification failing (curl exit code 3, URL malformed)
-Exit code 3 from curl means the URL string is empty. The SLACK_WEBHOOK_URL secret may have
-a name mismatch or trailing newline. The webhook URL itself is valid (tested manually).
-  INVESTIGATE: After fixing ANTHROPIC_API_KEY. If the bot succeeds, this step won't fire
-               anyway. If it still fails, delete and re-add SLACK_WEBHOOK_URL cleanly.
+### 3. v1.0.0 tag created before README was finalized
+The tag was created pointing to an early commit before the README screenshots were added.
+FIX: Deleted and recreated v1.0.0 pointing to the latest commit before publishing.
+     Safe to do since the release had not yet been published to the marketplace.
 
 ---
 
 ## Environment Notes
-- ANTHROPIC_API_KEY  — GitHub Secrets (broken, trailing newline) AND local .env
-- OPENAI_API_KEY     — GitHub Secrets AND local .env (kept as fallback, not used in code)
-- GITHUB_TOKEN       — GitHub Secrets AND local .env
-- SLACK_WEBHOOK_URL  — GitHub Secrets (may need re-adding)
-- DATABASE_URL       — hardcoded in workflow: postgresql://prbot:prbot123@localhost:5432/prbot_db
+
+- ANTHROPIC_API_KEY — GitHub Secrets (fixed, no trailing newline)
+- GITHUB_TOKEN — automatic, provided by GitHub Actions (${{ github.token }})
+- SLACK_WEBHOOK_URL — GitHub Secrets (never fully verified, only fires on failure)
+- DATABASE_URL — optional, not currently set in secrets (Postgres logging disabled)
 - Local .env is gitignored, never committed
-- PR-test is the test branch — PR #1 is the live test PR
 
 ---
 
 ## Next Steps (in order)
 
-1. Fix ANTHROPIC_API_KEY secret (see top — delete and re-add with no trailing newline)
-2. Verify Claude review quality — confirm the comment cites specific line numbers and gives a real verdict
-3. Fix Slack notification if still failing after step 1
-4. Merge PR-test to main once the full pipeline is green
-5. Deploy to Railway:
-     - Push main to GitHub
-     - railway.app → New Project → Deploy from GitHub
-     - Add Postgres plugin
-     - api service: Root Directory = api/, DATABASE_URL = Railway Postgres URL
-     - dashboard service: Root Directory = dashboard/, API_URL = public URL of the api service
-6. Clean up — remove OPENAI_API_KEY from secrets and .env once Claude is confirmed working
+1. Build the marketing landing page
+   - React app explaining what the tool does
+   - Show a real screenshot of a review comment
+   - Clear call to action linking to the marketplace listing
+   - Deploy to Railway or Vercel
+   - This is a separate repo from the action itself
+
+2. Support non-Python repositories
+   - run_linter and run_tests currently only make sense for Python
+   - Could add a language input and swap linter/test commands accordingly
+   - Or document clearly that linting/testing is Python-only and AI review works for any language
+
+3. Move api/ and dashboard/ to a separate repo
+   - These are personal infrastructure (FastAPI review history + React dashboard)
+   - They don't belong in the action source repo — confusing to outside contributors
+   - New repo name suggestion: git-auto-pr-dashboard
+
+4. Fix Slack notification (low priority)
+   - The curl step fires on failure — never triggered since the pipeline is green
+   - SLACK_WEBHOOK_URL secret may have a trailing newline (same issue as the API key had)
+   - Only matters if you want failure alerts
+
+5. Tag a major version alias
+   - Best practice is to also push a v1 tag that floats to the latest v1.x.x release
+   - Users can then pin to @v1 and get patch updates automatically
+   - Command: git tag -f v1 && git push origin v1 --force
