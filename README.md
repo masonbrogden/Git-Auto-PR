@@ -1,4 +1,3 @@
-<img width="584" height="322" alt="Screenshot 2026-05-15 200922" src="https://github.com/user-attachments/assets/d12b21e0-2a73-42a4-8240-59660d7c3369" />
 # Git-Auto-PR
 
 An AI-powered GitHub Actions bot that automatically reviews pull requests. When a PR is opened or updated, Git-Auto-PR runs flake8 linting, pytest with coverage, and generates a specific, line-cited code review using Claude AI — posted directly as a comment on the PR.
